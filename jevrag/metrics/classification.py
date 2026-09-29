@@ -49,3 +49,21 @@ def cohen_kappa(a: Sequence[Hashable], b: Sequence[Hashable]) -> float:
 def flip_rate(a: Sequence[Hashable], b: Sequence[Hashable]) -> float:
     """Share of paired items whose decision differs between two conditions."""
     return sum(1 for x, y in zip(a, b) if x != y) / max(len(a), 1)
+
+
+def auroc(scores: Sequence[float], labels: Sequence[int]) -> float:
+    """Probability that a random positive outranks a random negative (ties count half)."""
+    pairs = sorted(zip(scores, labels), key=lambda x: x[0])
+    n_pos = sum(1 for _, y in pairs if y)
+    n_neg = len(pairs) - n_pos
+    if n_pos == 0 or n_neg == 0:
+        return 0.5
+    rank_sum, i = 0.0, 0
+    while i < len(pairs):
+        j = i
+        while j < len(pairs) and pairs[j][0] == pairs[i][0]:
+            j += 1
+        avg_rank = (i + 1 + j) / 2
+        rank_sum += avg_rank * sum(1 for k in range(i, j) if pairs[k][1])
+        i = j
+    return (rank_sum - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg)
