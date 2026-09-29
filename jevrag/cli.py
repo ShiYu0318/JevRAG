@@ -17,39 +17,45 @@ from . import __version__
 from .env import load_dotenv
 
 
+def _retriever(paras, depth: int, dense: bool, cache_dir: Path):
+    from .retrieval import BM25, rrf
+
+    ids = sorted(paras)
+    t0 = time.time()
+    bm25 = BM25(ids, [paras[i].text for i in ids], unigrams=False)
+    print(f"bm25 index: {len(ids)} passages in {time.time() - t0:.1f}s", file=sys.stderr)
+    index = None
+    if dense:
+        from .retrieval.dense import DenseIndex
+        index = DenseIndex(ids, [paras[i].text for i in ids], cache=cache_dir / "bge-m3.npy")
+
+    def retrieve(queries: List[str]) -> List[List[Tuple[str, float]]]:
+        lex = [bm25.search(q, depth) for q in queries]
+        if index is None:
+            return lex
+        den = index.search_many(queries, depth)
+        return [rrf([x, y], top=depth) for x, y in zip(lex, den)]
+    return retrieve
+
+
 def cmd_build(a: argparse.Namespace) -> None:
     try:
         from .data import build as B
     except ImportError:
         sys.exit("the dataset builder is not included in this release yet")
     from .data import drcd
-    from .retrieval import BM25, rrf
 
     if a.download:
         drcd.download(a.raw)
     splits = a.splits.split(",")
     paras, questions = drcd.load(a.raw)  # the pool always holds every split
-    ids = sorted(paras)
-    t0 = time.time()
-    bm25 = BM25(ids, [paras[i].text for i in ids], unigrams=False)
-    print(f"bm25 index: {len(ids)} passages in {time.time() - t0:.1f}s", file=sys.stderr)
-    dense = None
-    if a.dense:
-        from .retrieval.dense import DenseIndex
-        dense = DenseIndex(ids, [paras[i].text for i in ids], cache=Path(a.out).parent / "bge-m3.npy")
-
-    def retrieve(queries: List[str]) -> List[List[Tuple[str, float]]]:
-        lex = [bm25.search(q, a.depth) for q in queries]
-        if dense is None:
-            return lex
-        den = dense.search_many(queries, a.depth)
-        return [rrf([x, y], top=a.depth) for x, y in zip(lex, den)]
+    retrieve = _retriever(paras, a.depth, a.dense, Path(a.out).parent)
 
     cfg = B.BuildConfig(k=a.k, seed=a.seed, pool_depth=a.depth,
                         conditions=tuple(a.conditions.split(",")) if a.conditions else B.BuildConfig.conditions)
     builder = B.Builder(paras, retrieve, cfg)
     out = Path(a.out)
-    meta = {"version": B.VERSION, "k": a.k, "seed": a.seed, "retrieval": "bm25+bge-m3 rrf" if dense else "bm25",
+    meta = {"version": B.VERSION, "k": a.k, "seed": a.seed, "retrieval": "bm25+bge-m3 rrf" if a.dense else "bm25",
             "opencc": B.opencc_available(), "splits": {}}
     for s in splits:
         t0 = time.time()
