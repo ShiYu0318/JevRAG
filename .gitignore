@@ -1,6 +1,6 @@
 __pycache__/
 *.pyc
-.venv/
+.venv
 .env
 *.egg-info/
 build/
@@ -9,6 +9,6 @@ dist/
 .pytest_cache/
 
 data/raw
-data/build/
+data/build
 results/
 cache/
