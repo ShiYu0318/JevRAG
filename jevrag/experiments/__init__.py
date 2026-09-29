@@ -1,3 +1,3 @@
-from . import e0
+from . import e0, e1
 
-EXPERIMENTS = {"E0": e0}
+EXPERIMENTS = {"E0": e0, "E1": e1}
