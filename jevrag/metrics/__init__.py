@@ -1,6 +1,7 @@
 from .calibration import (brier, brier_multiclass, classwise_ece, confident_error_rate, ece, ece_from,
                           reliability, top_label_ece)
 from .ranking import mrr_at_k, ndcg_at_k, recall_at_k
+from .selective import aurc, coverage_at_risk, risk_at_coverage, risk_coverage
 
 
 def percentile(xs, q: float) -> float:
