@@ -7,6 +7,7 @@ name = "jevrag"
 version = "0.1.0"
 description = "Typed decision models as the judgment layer of RAG pipelines"
 readme = "README.md"
+license = {text = "Apache-2.0"}
 requires-python = ">=3.9"
 dependencies = []
 

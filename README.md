@@ -46,10 +46,12 @@ For Chinese text, use Laya's multilingual checkpoint.
 
 ## Data
 
-Evaluation data is built from [DRCD](https://github.com/DRCKnowledgeTeam/DRCD) (CC BY-SA 3.0); anything derived from it will be released under the same license. Nothing is released yet.
+Evaluation data is built from [DRCD](https://github.com/DRCKnowledgeTeam/DRCD) (CC BY-SA 3.0). Nothing is released yet.
 
 ## License
 
-Code license not decided yet.
+Code is released under the [Apache License 2.0](LICENSE). Data derived from DRCD will be released under CC BY-SA 4.0, as its share-alike terms require.
+
+If you use this code, please cite it as described in [CITATION.cff](CITATION.cff).
 
 This project is not affiliated with TypeSafe AI.
