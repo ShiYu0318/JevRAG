@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import List, Tuple
 
 from . import __version__
+from .env import load_dotenv
 
 
 def cmd_build(a: argparse.Namespace) -> None:
@@ -130,6 +131,7 @@ def main(argv: List[str] | None = None) -> None:
     t.set_defaults(fn=cmd_tables)
 
     a = ap.parse_args(argv)
+    load_dotenv()
     a.fn(a)
 
 
