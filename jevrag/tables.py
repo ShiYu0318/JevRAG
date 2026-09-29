@@ -103,6 +103,12 @@ def e2_report(results: Path) -> str:
             if label in res:
                 parts += [f"### {label}", "", _table(["group", "n", "pos rate"] + cols,
                           [[g, r["n"], r["positive_rate"]] + [r[c] for c in cols] for g, r in res[label].items()]), ""]
+        for name, entry in res.get("baselines", {}).items():
+            for label in ("raw_sigmoid", "platt_scaled"):
+                if label in entry:
+                    parts += [f"### {name} ({label})", "", _table(["group", "n", "pos rate"] + cols,
+                              [[g, r["n"], r["positive_rate"]] + [r[c] for c in cols]
+                               for g, r in entry[label].items()]), ""]
         if "temperature" in res:
             parts += [f"Temperature (fitted on the fit split): passage {_fmt(res['temperature']['passage'])}, "
                       f"set {_fmt(res['temperature']['set'])}", ""]
