@@ -47,7 +47,7 @@ class Run:
         self.config = config
         self.datasets = datasets or {}
         self.clients: List[SystemOneClient] = []
-        self._calls = (self.dir / "calls.jsonl").open("a", encoding="utf-8")
+        self._calls = (self.dir / "calls.jsonl").open("a", encoding="utf-8", buffering=1)
         self._lock = threading.Lock()
         self.started = now()
         self.summary: Dict[str, Any] = {}
