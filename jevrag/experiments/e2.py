@@ -12,8 +12,8 @@ from typing import Any, Dict, List, Tuple
 
 from ..backends.systemone import SystemOneClient
 from ..data import tc
-from ..metrics import (apply_temperature, aurc, auroc, brier, confident_error_rate, coverage_at_risk, ece,
-                       fit_temperature, reliability)
+from ..metrics import (apply_platt, apply_temperature, aurc, auroc, brier, confident_error_rate, coverage_at_risk,
+                       ece, fit_platt, fit_temperature, reliability)
 from ..runlog import Run
 from .common import by_condition, merge, passage_grades, verdicts
 
@@ -24,6 +24,7 @@ DEFAULTS: Dict[str, Any] = {
     "fit_split": "training",
     "fit_n_per_condition": 150,
     "n_bins": 15,
+    "baselines": [],
     "lang": "en",
     "workers": 8,
     "seed": 7,
@@ -48,6 +49,17 @@ def collect(client: SystemOneClient, items: List[dict], cfg: Dict[str, Any], par
         "all_passages": groups["gold"] + groups["hard_negative"] + groups["easy_negative"],
         "set": groups["set"],
     }
+
+
+def reranker_logits(model, items: List[dict]) -> Dict[str, Pairs]:
+    """Same passage groups as `collect`, scored by a cross-encoder (raw logits)."""
+    groups: Dict[str, Pairs] = {"gold": [], "hard_negative": [], "easy_negative": []}
+    for it in items:
+        ctx = [c for c in it["contexts"] if c["role"] in groups]
+        for c, s in zip(ctx, model.score(it["question"], [c["text"] for c in ctx])):
+            groups[c["role"]].append((s, int(c["role"] == "gold")))
+    return {"hard": groups["gold"] + groups["hard_negative"], "easy": groups["gold"] + groups["easy_negative"],
+            "all_passages": groups["gold"] + groups["hard_negative"] + groups["easy_negative"]}
 
 
 def audit(pairs: Pairs, n_bins: int) -> Dict[str, Any]:
@@ -93,6 +105,21 @@ def run(client: SystemOneClient, run: Run, split: str, overrides: Dict[str, Any]
             scaled[g] = audit(list(zip(p, [y for _, y in pairs])), cfg["n_bins"])
         result["temperature"] = temps
         result["scaled"] = scaled
+
+    if "bge-reranker" in cfg["baselines"]:
+        from ..baselines.cross_encoder import CrossEncoderReranker
+        model = CrossEncoderReranker()
+        ev_b = reranker_logits(model, items)
+        entry: Dict[str, Any] = {"raw_sigmoid": {g: audit(list(zip(apply_platt([s for s, _ in v], 1.0, 0.0),
+                                                                     [y for _, y in v])), cfg["n_bins"])
+                                                 for g, v in ev_b.items()}}
+        if cfg["fit_split"]:
+            fit_b = reranker_logits(model, fit_items)["all_passages"]
+            a, b = fit_platt([s for s, _ in fit_b], [y for _, y in fit_b])
+            entry["platt"] = {"a": a, "b": b}
+            entry["platt_scaled"] = {g: audit(list(zip(apply_platt([s for s, _ in v], a, b), [y for _, y in v])),
+                                              cfg["n_bins"]) for g, v in ev_b.items()}
+        result["baselines"] = {"bge-reranker": entry}
 
     run.summary = {"ece_easy": raw["easy"]["ece_width"], "ece_hard": raw["hard"]["ece_width"],
                    "ece_set": raw["set"]["ece_width"]}
