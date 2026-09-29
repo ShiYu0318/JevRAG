@@ -2,6 +2,7 @@
 lists of per-class probability dicts."""
 from __future__ import annotations
 
+import math
 from typing import Dict, List, Mapping, Sequence, Tuple
 
 Bin = Tuple[float, float, int]  # (mean confidence, accuracy, count)
@@ -78,3 +79,50 @@ def confident_error_rate(conf: Sequence[float], correct: Sequence[int], thr: flo
     """Share of all items answered wrongly with confidence >= thr."""
     bad = sum(1 for c, y in zip(conf, correct) if c >= thr and not y)
     return bad / max(len(conf), 1)
+
+
+# ---- temperature scaling ---------------------------------------------------
+_EPS = 1e-6
+
+
+def _logit(p: float) -> float:
+    p = min(max(p, _EPS), 1 - _EPS)
+    return math.log(p / (1 - p))
+
+
+def apply_temperature(probs: Sequence[float], t: float) -> List[float]:
+    return [1 / (1 + math.exp(-_logit(p) / t)) for p in probs]
+
+
+def apply_temperature_multiclass(probs: Sequence[Mapping[str, float]], t: float) -> List[Dict[str, float]]:
+    out = []
+    for p in probs:
+        logs = {k: math.log(max(v, _EPS)) / t for k, v in p.items()}
+        m = max(logs.values())
+        z = sum(math.exp(v - m) for v in logs.values())
+        out.append({k: math.exp(v - m) / z for k, v in logs.items()})
+    return out
+
+
+def _nll(probs: Sequence[float], labels: Sequence[int]) -> float:
+    return -sum(math.log(max(p if y else 1 - p, _EPS)) for p, y in zip(probs, labels)) / max(len(probs), 1)
+
+
+def fit_temperature(probs: Sequence[float], labels: Sequence[int], lo: float = 0.05, hi: float = 20.0,
+                    iters: int = 80) -> float:
+    """Temperature minimising binary NLL, by golden-section search on log T."""
+    a, b = math.log(lo), math.log(hi)
+    g = (math.sqrt(5) - 1) / 2
+    f = lambda x: _nll(apply_temperature(probs, math.exp(x)), labels)  # noqa: E731
+    c, d = b - g * (b - a), a + g * (b - a)
+    fc, fd = f(c), f(d)
+    for _ in range(iters):
+        if fc < fd:
+            b, d, fd = d, c, fc
+            c = b - g * (b - a)
+            fc = f(c)
+        else:
+            a, c, fc = c, d, fd
+            d = a + g * (b - a)
+            fd = f(d)
+    return math.exp((a + b) / 2)
