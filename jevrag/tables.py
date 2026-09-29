@@ -74,7 +74,8 @@ def _ci(x) -> str:
 def e1_report(results: Path) -> str:
     parts = ["# E1 rerank", ""]
     for key, d in sorted(_latest(results, "E1").items()):
-        _, res, head = _load(d, "E1")
+        man, res, head = _load(d, "E1")
+        ref = man["config"].get("reference", "rrf")
         parts += [f"## {key}", ""] + head
         parts += [f"{res['n_items']} questions, gold in pool {_fmt(res['pool_gold_recall@20'])}", ""]
         rows = []
@@ -83,13 +84,15 @@ def e1_report(results: Path) -> str:
             rows.append([m, _ci(r["ndcg@10"]), _ci(r["mrr@10"]), _ci(r["recall@5"]),
                          f"{vs['diff']:+.3f} [{vs['lo']:+.3f}, {vs['hi']:+.3f}]" if vs else "",
                          ("yes" if vs["non_inferior"] else "no") if vs else ""])
-        parts += [_table(["method", "nDCG@10", "MRR@10", "Recall@5", "Δ nDCG vs rrf", "non-inferior"], rows), ""]
+        parts += [_table(["method", "nDCG@10", "MRR@10", "Recall@5", f"Δ nDCG vs {ref}", "non-inferior"], rows), ""]
         if res.get("packed_subset"):
             parts += ["Packed subset:", "", _table(["method", "nDCG@10"], [[m, _ci(r["ndcg@10"])] for m, r in
                                                                          res["packed_subset"].items()]), ""]
         lat = res["latency_ms_per_question"]
-        parts += [f"Latency per question (20 passages): p50 {_fmt(lat['p50'])} ms, p95 {_fmt(lat['p95'])} ms"
-                  f" · cost per 1k questions ${res['cost_per_1k_questions']:.4f}", ""]
+        cached = man["calls"] and man["cache_hits"] == man["calls"]
+        latency = ("Latency not measured: every call was served from the cache" if cached else
+                   f"Latency per question (20 passages): p50 {_fmt(lat['p50'])} ms, p95 {_fmt(lat['p95'])} ms")
+        parts += [f"{latency} · cost per 1k questions ${res['cost_per_1k_questions']:.4f}", ""]
     return "\n".join(parts)
 
 
