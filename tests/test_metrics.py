@@ -41,6 +41,22 @@ class CalibrationTest(unittest.TestCase):
         self.assertEqual(set(cw), {"a", "b"})
         self.assertAlmostEqual(M.top_label_ece(probs, ["a", "b"], n_bins=10), (0.3 + 0.4) / 2)
 
+    def test_temperature_and_platt_recover_parameters(self):
+        import random
+        r = random.Random(1)
+        scores = [r.gauss(0, 2) for _ in range(4000)]
+        labels = [int(r.random() < 1 / (1 + math.exp(-(0.5 * s - 1)))) for s in scores]
+        a, b = M.fit_platt(scores, labels)
+        self.assertAlmostEqual(a, 0.5, delta=0.05)
+        self.assertAlmostEqual(b, -1.0, delta=0.1)
+        probs = M.apply_platt(scores, 2.0, 0.0)  # over-confident by a factor of 4 relative to the truth slope
+        t = M.fit_temperature(probs, [int(r.random() < p ** 0.25 / (p ** 0.25 + (1 - p) ** 0.25)) for p in probs])
+        self.assertAlmostEqual(t, 4.0, delta=0.6)
+
+    def test_auroc(self):
+        self.assertEqual(M.auroc([0.1, 0.4, 0.35, 0.8], [0, 0, 1, 1]), 0.75)
+        self.assertEqual(M.auroc([0.5, 0.5], [0, 1]), 0.5)
+
     def test_confident_error(self):
         self.assertEqual(M.confident_error_rate([0.95, 0.95, 0.5], [0, 1, 0]), 1 / 3)
 
