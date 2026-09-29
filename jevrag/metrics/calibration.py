@@ -126,3 +126,33 @@ def fit_temperature(probs: Sequence[float], labels: Sequence[int], lo: float = 0
             d = a + g * (b - a)
             fd = f(d)
     return math.exp((a + b) / 2)
+
+
+def fit_platt(scores: Sequence[float], labels: Sequence[int], iters: int = 50) -> Tuple[float, float]:
+    """Platt scaling: fit P(y=1) = sigmoid(a * score + b) by Newton's method."""
+    a, b = 1.0, 0.0
+    for _ in range(iters):
+        ga = gb = haa = hab = hbb = 0.0
+        for s, y in zip(scores, labels):
+            p = 1 / (1 + math.exp(-max(-35.0, min(35.0, a * s + b))))
+            w = p * (1 - p)
+            ga += (p - y) * s
+            gb += p - y
+            haa += w * s * s
+            hab += w * s
+            hbb += w
+        haa += 1e-6
+        hbb += 1e-6
+        det = haa * hbb - hab * hab
+        if det <= 0:
+            break
+        da = (hbb * ga - hab * gb) / det
+        db = (haa * gb - hab * ga) / det
+        a, b = a - da, b - db
+        if abs(da) < 1e-9 and abs(db) < 1e-9:
+            break
+    return a, b
+
+
+def apply_platt(scores: Sequence[float], a: float, b: float) -> List[float]:
+    return [1 / (1 + math.exp(-max(-35.0, min(35.0, a * s + b)))) for s in scores]

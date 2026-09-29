@@ -1,5 +1,6 @@
-from .calibration import (apply_temperature, apply_temperature_multiclass, brier, brier_multiclass, classwise_ece,
-                          confident_error_rate, ece, ece_from, fit_temperature, reliability, top_label_ece)
+from .calibration import (apply_platt, apply_temperature, apply_temperature_multiclass, brier, brier_multiclass,
+                          classwise_ece, confident_error_rate, ece, ece_from, fit_platt, fit_temperature,
+                          reliability, top_label_ece)
 from .classification import accuracy, auroc, cohen_kappa, confusion, flip_rate, macro_f1, per_class_f1
 from .ranking import mrr_at_k, ndcg_at_k, recall_at_k
 from .selective import aurc, coverage_at_risk, risk_at_coverage, risk_coverage
