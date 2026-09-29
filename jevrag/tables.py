@@ -125,6 +125,9 @@ def e3_report(results: Path) -> str:
             rows.append([f"two-stage {a}", _ci(r["macro_f1"])] + [r["per_class_f1"][c] for c in classes])
         rows.append(["majority", _ci(res["majority"]["macro_f1"])] + [res["majority"]["per_class_f1"][c]
                                                                      for c in classes])
+        if "nli" in res:
+            rows.append(["NLI (gold answer, optimistic)", _ci(res["nli"]["macro_f1"])]
+                        + [res["nli"]["per_class_f1"][c] for c in classes])
         parts += [_table(["method", "macro-F1"] + [f"F1 {c}" for c in classes], rows), ""]
         acc = res["set"]["accuracy_by_condition"]
         parts += ["Set-level accuracy by condition: " + ", ".join(f"{c} {_fmt(v)}" for c, v in acc.items()), "",
