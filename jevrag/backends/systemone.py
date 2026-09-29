@@ -151,6 +151,15 @@ class SystemOneClient:
         with ThreadPoolExecutor(max_workers=workers) as ex:
             return list(ex.map(lambda j: self.ask(*j, **kw), jobs))
 
+    def server_info(self) -> Dict[str, Any]:
+        """GET /health when the server has one (Laya reports checkpoint revisions there)."""
+        url = self.url.rsplit("/v1/", 1)[0] + "/health"
+        try:
+            with urllib.request.urlopen(url, timeout=5) as r:
+                return json.loads(r.read().decode("utf-8"))
+        except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+            return {}
+
     # ---- internals -----------------------------------------------------
     def _post(self, body: Dict[str, Any]) -> tuple:
         data = json.dumps(body, ensure_ascii=False).encode("utf-8")
@@ -201,7 +210,7 @@ class SystemOneClient:
                 "model_version": resp.model,
                 "answers": {k: a.raw for k, a in resp.answers.items()},
                 "latency_ms": round(resp.latency_ms, 1),
-                "usage": {"input_tokens": tokens, "cost_usd": 0.0 if resp.cache_hit else cost},
+                "usage": {**resp.usage, "input_tokens": tokens, "cost_usd": 0.0 if resp.cache_hit else cost},
                 "cache_hit": resp.cache_hit,
             })
 

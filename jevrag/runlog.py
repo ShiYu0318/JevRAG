@@ -51,6 +51,7 @@ class Run:
         self._lock = threading.Lock()
         self.started = now()
         self.summary: Dict[str, Any] = {}
+        self.server_info: Dict[str, Any] = {}
 
     def log_call(self, row: Dict[str, Any]) -> None:
         line = json.dumps({"run_id": self.id, **row}, ensure_ascii=False)
@@ -60,6 +61,8 @@ class Run:
     def attach(self, client: SystemOneClient) -> SystemOneClient:
         client.on_call = self.log_call
         self.clients.append(client)
+        if "openrouter" not in client.url:
+            self.server_info[client.name] = client.server_info()
         return client
 
     def write(self, name: str, obj: Any) -> Path:
@@ -79,6 +82,7 @@ class Run:
             "config": self.config,
             "datasets": self.datasets,
             "model_versions": {c.name: c.meter.versions for c in self.clients},
+            "server_info": self.server_info,
             "calls": sum(c.meter.calls for c in self.clients),
             "cache_hits": sum(c.meter.cache_hits for c in self.clients),
             "input_tokens": sum(c.meter.input_tokens for c in self.clients),
