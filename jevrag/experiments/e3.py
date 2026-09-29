@@ -10,8 +10,9 @@ Thresholds are fitted on dev and must be passed in for any other split.
 """
 from __future__ import annotations
 
+import time
 from collections import Counter
-from typing import Any, Dict, List, Sequence
+from typing import Any, Dict, List, Sequence, Tuple
 
 from ..backends.systemone import SystemOneClient
 from ..data import tc
@@ -27,6 +28,8 @@ DEFAULTS: Dict[str, Any] = {
     "n_per_condition": 100,
     "aggregations": ["max", "noisy_or", "sum"],
     "thresholds": None,
+    "baselines": [],
+    "nli_thresholds": None,
     "lang": "en",
     "workers": 8,
     "seed": 7,
@@ -71,6 +74,50 @@ def _report(labels: List[str], preds: List[str], conds: List[str], cfg: Dict[str
     return out
 
 
+def _conjunction_parts(question: str, answer: str) -> List[Tuple[str, str]]:
+    try:
+        from ..data.build import split_conjunction
+    except ImportError:  # builder not available: treat every question as a single question
+        return []
+    return split_conjunction(question, answer)
+
+
+def nli_baseline(items: List[dict], labels: List[str], conds: List[str], split: str,
+                 cfg: Dict[str, Any]) -> Dict[str, Any]:
+    """NLI aggregation baseline. The hypothesis uses the gold answer, so this is optimistic."""
+    from ..baselines.nli import NLIScorer, hypothesis, verdict
+
+    scorer = NLIScorer()
+    t0 = time.perf_counter()
+    feats = []
+    for it in items:
+        ps = tc.passages(it)
+        parts = _conjunction_parts(it["question"], it["answers"][0])
+        if parts:
+            sub = []
+            for q, a in parts:
+                sc = scorer.score([(p, hypothesis(q, a)) for p in ps])
+                sub.append(max(s["entailment"] for s in sc))
+            feats.append(([], [], sub))
+        else:
+            sc = scorer.score([(p, hypothesis(it["question"], it["answers"][0])) for p in ps])
+            feats.append(([s["entailment"] for s in sc], [s["contradiction"] for s in sc], []))
+    seconds = time.perf_counter() - t0
+
+    grid = [round(0.05 * i, 2) for i in range(1, 20)]
+    th = cfg["nli_thresholds"]
+    if th is None:
+        if split != "dev":
+            raise ValueError("NLI thresholds must come from a dev run for any split other than dev")
+        best = max(((te, tcn) for te in grid for tcn in grid),
+                   key=lambda t: macro_f1(labels, [verdict(e, c, s, *t) for e, c, s in feats], VERDICTS))
+        th = {"tau_e": best[0], "tau_c": best[1]}
+    preds = [verdict(e, c, s, th["tau_e"], th["tau_c"]) for e, c, s in feats]
+    rep = _report(labels, preds, conds, cfg)
+    rep.update({"thresholds": th, "uses_gold_answer": True, "seconds": round(seconds, 1)})
+    return rep
+
+
 def run(client: SystemOneClient, run: Run, split: str, overrides: Dict[str, Any]) -> Dict[str, Any]:
     cfg = merge(DEFAULTS, overrides)
     conds = list(cfg["conditions"]) + list(cfg["extra_conditions"])
@@ -113,6 +160,9 @@ def run(client: SystemOneClient, run: Run, split: str, overrides: Dict[str, Any]
         for a in cfg["aggregations"]}
     majority = Counter(labels).most_common(1)[0][0]
     result["majority"] = _report(labels, [majority] * len(labels), cnd, cfg)
+
+    if "nli" in cfg["baselines"]:
+        result["nli"] = nli_baseline(main, labels, cnd, split, cfg)
 
     conflicts = [set_pred[i["id"]] for i in main if i["condition"] == "C"]
     result["conflict_predicted_as"] = dict(Counter(conflicts))
