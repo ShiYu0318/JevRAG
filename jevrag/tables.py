@@ -11,7 +11,7 @@ def _latest(results: Path, exp: str) -> Dict[str, Path]:
     runs: Dict[str, Path] = {}
     for m in sorted(results.glob(f"{exp}-*/manifest.json")):
         man = json.loads(m.read_text(encoding="utf-8"))
-        runs[man["backend"]] = m.parent
+        runs[f"{man['backend']} / {man['split']}"] = m.parent
     return runs
 
 
@@ -59,7 +59,102 @@ def e0_report(results: Path) -> str:
     return "\n".join(parts)
 
 
-REPORTS = {"E0": ("E0_backend_profile.md", e0_report)}
+def _load(d: Path, exp: str):
+    man = json.loads((d / "manifest.json").read_text(encoding="utf-8"))
+    res = json.loads((d / f"{exp}.json").read_text(encoding="utf-8"))
+    head = [f"run `{man['run_id']}` · versions `{json.dumps(man['model_versions'], ensure_ascii=False)}`"
+            f" · commit `{man['git_commit'][:10]}` · cost ${man['cost_usd']:.4f}", ""]
+    return man, res, head
+
+
+def _ci(x) -> str:
+    return f"{x['value']:.3f} [{x['lo']:.3f}, {x['hi']:.3f}]"
+
+
+def e1_report(results: Path) -> str:
+    parts = ["# E1 rerank", ""]
+    for key, d in sorted(_latest(results, "E1").items()):
+        _, res, head = _load(d, "E1")
+        parts += [f"## {key}", ""] + head
+        parts += [f"{res['n_items']} questions, gold in pool {_fmt(res['pool_gold_recall@20'])}", ""]
+        rows = []
+        for m, r in res["methods"].items():
+            vs = r.get("vs_reference_ndcg@10")
+            rows.append([m, _ci(r["ndcg@10"]), _ci(r["mrr@10"]), _ci(r["recall@5"]),
+                         f"{vs['diff']:+.3f} [{vs['lo']:+.3f}, {vs['hi']:+.3f}]" if vs else "",
+                         ("yes" if vs["non_inferior"] else "no") if vs else ""])
+        parts += [_table(["method", "nDCG@10", "MRR@10", "Recall@5", "Δ nDCG vs rrf", "non-inferior"], rows), ""]
+        if res.get("packed_subset"):
+            parts += ["Packed subset:", "", _table(["method", "nDCG@10"], [[m, _ci(r["ndcg@10"])] for m, r in
+                                                                         res["packed_subset"].items()]), ""]
+        lat = res["latency_ms_per_question"]
+        parts += [f"Latency per question (20 passages): p50 {_fmt(lat['p50'])} ms, p95 {_fmt(lat['p95'])} ms"
+                  f" · cost per 1k questions ${res['cost_per_1k_questions']:.4f}", ""]
+    return "\n".join(parts)
+
+
+def e2_report(results: Path) -> str:
+    parts = ["# E2 calibration", ""]
+    cols = ["ece_width", "ece_mass", "brier", "auroc", "aurc", "confident_error_rate@0.9", "coverage@risk0.05"]
+    for key, d in sorted(_latest(results, "E2").items()):
+        _, res, head = _load(d, "E2")
+        parts += [f"## {key}", ""] + head
+        for label in ("raw", "scaled"):
+            if label in res:
+                parts += [f"### {label}", "", _table(["group", "n", "pos rate"] + cols,
+                          [[g, r["n"], r["positive_rate"]] + [r[c] for c in cols] for g, r in res[label].items()]), ""]
+        if "temperature" in res:
+            parts += [f"Temperature (fitted on the fit split): passage {_fmt(res['temperature']['passage'])}, "
+                      f"set {_fmt(res['temperature']['set'])}", ""]
+        h = res["h2"]
+        parts += [f"H2: ECE easy {_fmt(h['ece_easy'])}, hard {_fmt(h['ece_hard'])}, gap {_fmt(h['gap'])}"
+                  f" → {'supported' if h['supported'] else 'not supported'}", ""]
+    return "\n".join(parts)
+
+
+def e3_report(results: Path) -> str:
+    parts = ["# E3 evidence sufficiency", ""]
+    classes = ["sufficient", "partial", "conflicting", "insufficient"]
+    for key, d in sorted(_latest(results, "E3").items()):
+        _, res, head = _load(d, "E3")
+        parts += [f"## {key}", ""] + head + [f"n = {res['n']} {res['n_by_condition']}", ""]
+        rows = [["set"] + [_ci(res["set"]["macro_f1"])] + [res["set"]["per_class_f1"][c] for c in classes]]
+        for a, r in res["per_passage"].items():
+            rows.append([f"per-passage {a}", _ci(r["macro_f1"])] + [r["per_class_f1"][c] for c in classes])
+        for a, r in res["two_stage"].items():
+            rows.append([f"two-stage {a}", _ci(r["macro_f1"])] + [r["per_class_f1"][c] for c in classes])
+        rows.append(["majority", _ci(res["majority"]["macro_f1"])] + [res["majority"]["per_class_f1"][c]
+                                                                     for c in classes])
+        parts += [_table(["method", "macro-F1"] + [f"F1 {c}" for c in classes], rows), ""]
+        acc = res["set"]["accuracy_by_condition"]
+        parts += ["Set-level accuracy by condition: " + ", ".join(f"{c} {_fmt(v)}" for c, v in acc.items()), "",
+                  f"Set-level top-label ECE {_fmt(res['set']['top_label_ece'])}", "",
+                  f"Conflicting predicted as: {res['conflict_predicted_as']}", "",
+                  "Evidence AUROC: " + ", ".join(f"{a} {_fmt(r['evidence_auroc'])}"
+                                                 for a, r in res["per_passage"].items()), "",
+                  f"Thresholds: {json.dumps(res['thresholds'])}", "",
+                  f"Extra conditions: {json.dumps(res['extra'])}", ""]
+    return "\n".join(parts)
+
+
+def e4_report(results: Path) -> str:
+    parts = ["# E4 script and instruction language", ""]
+    for key, d in sorted(_latest(results, "E4").items()):
+        _, res, head = _load(d, "E4")
+        parts += [f"## {key}", ""] + head + [f"n = {res['n']}", ""]
+        rows = []
+        for k, r in res["settings"].items():
+            fl = r.get("flip_rate_vs_base")
+            rows.append([k, r["macro_f1"], r["accuracy"], r["top_label_ece"], r["mean_confidence"],
+                         _ci(fl) if fl else "base", _fmt(r.get("passage_flip_rate_vs_base", ""))])
+        parts += [_table(["script / instructions", "macro-F1", "accuracy", "ECE", "mean conf",
+                          "set flip vs base", "passage flip"], rows), ""]
+    return "\n".join(parts)
+
+
+REPORTS = {"E0": ("E0_backend_profile.md", e0_report), "E1": ("E1_rerank.md", e1_report),
+           "E2": ("E2_calibration.md", e2_report), "E3": ("E3_sufficiency.md", e3_report),
+           "E4": ("E4_script_robustness.md", e4_report)}
 
 
 def make_tables(results: str | Path = "results", out: str | Path = "docs/results") -> List[Path]:
