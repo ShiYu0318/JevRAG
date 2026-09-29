@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "JevRAG"
+abstract: "Typed decision models as the judgment layer of RAG pipelines."
+type: software
+authors:
+  - family-names: Huang
+    given-names: ShiYu
+    alias: ShiYu0318
+repository-code: "https://github.com/ShiYu0318/JevRAG"
+version: 0.1.0
+license: Apache-2.0
+keywords:
+  - retrieval-augmented generation
+  - calibration
+  - Traditional Chinese
