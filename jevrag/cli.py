@@ -69,6 +69,24 @@ def cmd_build(a: argparse.Namespace) -> None:
     (out / "build.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def cmd_pools(a: argparse.Namespace) -> None:
+    from .data import drcd
+    from .data.jsonl import write_rows
+    from .data.pools import build_pools
+
+    paras, questions = drcd.load(a.raw)
+    retrieve = _retriever(paras, max(a.depth, 20), a.dense, Path(a.out).parent)
+    out = Path(a.out)
+    meta = {"depth": a.depth, "retrieval": "bm25+bge-m3 rrf" if a.dense else "bm25", "splits": {}}
+    for s in a.splits.split(","):
+        rows = build_pools(questions[s], retrieve, a.depth)
+        hit = sum(1 for r in rows if any(c["pid"] in r["qrels"] for c in r["candidates"])) / max(len(rows), 1)
+        meta["splits"][s] = {"sha256": write_rows(out / f"{s}.jsonl", rows), "n": len(rows),
+                             f"gold_recall@{a.depth}": round(hit, 4)}
+        print(f"{s}: {len(rows)} pools, gold recall@{a.depth} {hit:.3f}", file=sys.stderr)
+    (out / "pools.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def cmd_run(a: argparse.Namespace) -> None:
     from .backends import get_backend
     from .cache import CallCache
@@ -130,6 +148,14 @@ def main(argv: List[str] | None = None) -> None:
     r.add_argument("--no-cache", action="store_true")
     r.add_argument("--pin-version")
     r.set_defaults(fn=cmd_run)
+
+    pl = sub.add_parser("pools", help="freeze rerank candidate pools")
+    pl.add_argument("--raw", default="data/raw")
+    pl.add_argument("--out", default="data/build/pools-v0.1.0")
+    pl.add_argument("--splits", default="dev,test")
+    pl.add_argument("--depth", type=int, default=20)
+    pl.add_argument("--dense", action="store_true")
+    pl.set_defaults(fn=cmd_pools)
 
     t = sub.add_parser("tables", help="render reports from results/")
     t.add_argument("--results", default="results")
