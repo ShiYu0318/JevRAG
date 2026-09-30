@@ -114,7 +114,7 @@ def cmd_audit(a: argparse.Namespace) -> None:
 
 
 def cmd_run(a: argparse.Namespace) -> None:
-    from .backends import get_backend
+    from .backends import get_backend, run_mismatch
     from .cache import CallCache
     from .config import load_config
     from .experiments import EXPERIMENTS
@@ -127,6 +127,9 @@ def cmd_run(a: argparse.Namespace) -> None:
     budget = cfg.get("budget_usd")
     client = get_backend(a.backend, cache=None if a.no_cache else CallCache(a.cache),
                          pin_version=a.pin_version, budget_usd=budget)
+    problem = run_mismatch(client)
+    if problem:
+        sys.exit(problem)
     datasets = {}
     for key in ("dataset", "length_dataset"):
         if key in cfg:
