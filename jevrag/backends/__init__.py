@@ -24,12 +24,35 @@ def _jev(**kw: Any) -> SystemOneClient:
                            usd_per_mtok=JEV_USD_PER_MTOK, **kw)
 
 
-def _kev(name: str) -> Any:
-    # One Kev run per server process; the size is chosen at `kev.serve --run`.
+def _kev(name: str, run: str) -> Any:
+    # One Kev run per server process; the size is chosen at `kev.serve --run`,
+    # so `expected_run` lets callers check that the server loaded the right one.
     def make(**kw: Any) -> SystemOneClient:
         port = int(os.environ.get("KEV_PORT", 8009))
-        return SystemOneClient(f"http://127.0.0.1:{port}", "kev-latest", name=name, **kw)
+        c = SystemOneClient(f"http://127.0.0.1:{port}", "kev-latest", name=name, **kw)
+        c.expected_run = run
+        return c
     return make
+
+
+def loaded_run(info: dict) -> str:
+    """The Kev run named in a /v1/models answer, or ''."""
+    models = info.get("models") or []
+    return str(models[0].get("run", "")) if models and isinstance(models[0], dict) else ""
+
+
+def run_mismatch(client: SystemOneClient, info: dict | None = None) -> str:
+    """Why `client` should not be used, if its server loaded a different run; '' when fine."""
+    expected = getattr(client, "expected_run", None)
+    if not expected:
+        return ""
+    info = client.server_info() if info is None else info
+    if not info:
+        return f"{client.name}: no server at {client.url.rsplit('/v1/', 1)[0]}"
+    run = loaded_run(info)
+    if not run.endswith(expected):
+        return f"{client.name}: the server is serving {run or 'an unknown run'}, not {expected}"
+    return ""
 
 
 def _laya(checkpoint: str, name: str) -> Any:
@@ -50,9 +73,9 @@ def _mock(**kw: Any) -> SystemOneClient:
 
 REGISTRY = {
     "jev": _jev,
-    "kev4b": _kev("kev4b"),
-    "kev08b": _kev("kev08b"),
-    "kev27b": _kev("kev27b"),
+    "kev4b": _kev("kev4b", "kev-4b"),
+    "kev08b": _kev("kev08b", "kev-0.8b"),
+    "kev27b": _kev("kev27b", "kev-27b"),
     "laya-ml": _laya("multilingual", "laya-ml"),
     "laya-en": _laya("english", "laya-en"),
     "mock": _mock,
@@ -72,4 +95,4 @@ def available() -> List[str]:
 
 
 __all__ = ["Answer", "BudgetExceeded", "Response", "SystemOneClient", "SystemOneError",
-           "choice", "noul", "score", "get_backend", "available", "REGISTRY"]
+           "choice", "noul", "score", "get_backend", "available", "loaded_run", "run_mismatch", "REGISTRY"]
