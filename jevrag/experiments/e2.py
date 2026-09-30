@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Tuple
 from ..backends.systemone import SystemOneClient
 from ..data import tc
 from ..metrics import (apply_platt, apply_temperature, aurc, auroc, brier, confident_error_rate, coverage_at_risk,
-                       ece, fit_platt, fit_temperature, reliability)
+                       ece, fit_platt, fit_temperature, logit, reliability)
 from ..runlog import Run
 from .common import by_condition, merge, passage_grades, verdicts
 
@@ -31,6 +31,7 @@ DEFAULTS: Dict[str, Any] = {
 }
 
 Pairs = List[Tuple[float, int]]
+TEMPERATURE_MAX = 100.0
 
 
 def collect(client: SystemOneClient, items: List[dict], cfg: Dict[str, Any], part: str) -> Dict[str, Pairs]:
@@ -97,14 +98,26 @@ def run(client: SystemOneClient, run: Run, split: str, overrides: Dict[str, Any]
         fit_items = by_condition(tc.load(cfg["dataset"], cfg["fit_split"], cfg["conditions"]),
                                  cfg["fit_n_per_condition"], cfg["seed"])
         fit = collect(client, fit_items, cfg, "fit")
-        temps = {"passage": fit_temperature(*zip(*fit["all_passages"])), "set": fit_temperature(*zip(*fit["set"]))}
+        temps = {"passage": fit_temperature(*zip(*fit["all_passages"]), hi=TEMPERATURE_MAX),
+                 "set": fit_temperature(*zip(*fit["set"]), hi=TEMPERATURE_MAX)}
         scaled = {}
         for g, pairs in ev.items():
             t = temps["set" if g == "set" else "passage"]
             p = apply_temperature([x for x, _ in pairs], t)
             scaled[g] = audit(list(zip(p, [y for _, y in pairs])), cfg["n_bins"])
         result["temperature"] = temps
+        result["temperature_at_search_bound"] = {k: v >= TEMPERATURE_MAX * 0.99 for k, v in temps.items()}
         result["scaled"] = scaled
+
+        # Platt on the logit also shifts the probabilities, which temperature alone cannot do.
+        platt = {}
+        for key, pairs in (("passage", fit["all_passages"]), ("set", fit["set"])):
+            platt[key] = fit_platt([logit(x) for x, _ in pairs], [y for _, y in pairs])
+        result["platt"] = {k: {"a": a, "b": b} for k, (a, b) in platt.items()}
+        result["platt_scaled"] = {
+            g: audit(list(zip(apply_platt([logit(x) for x, _ in pairs], *platt["set" if g == "set" else "passage"]),
+                              [y for _, y in pairs])), cfg["n_bins"])
+            for g, pairs in ev.items()}
 
     if "bge-reranker" in cfg["baselines"]:
         from ..baselines.cross_encoder import CrossEncoderReranker
