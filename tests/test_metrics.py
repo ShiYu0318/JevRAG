@@ -53,6 +53,15 @@ class CalibrationTest(unittest.TestCase):
         t = M.fit_temperature(probs, [int(r.random() < p ** 0.25 / (p ** 0.25 + (1 - p) ** 0.25)) for p in probs])
         self.assertAlmostEqual(t, 4.0, delta=0.6)
 
+    def test_platt_stays_finite_on_separable_data(self):
+        scores = [float(i) for i in range(-10, 11)]
+        labels = [int(x > 0) for x in scores]
+        a, b = M.fit_platt(scores, labels)
+        self.assertTrue(0 < a < 50)
+        probs = M.apply_platt(scores, a, b)
+        self.assertEqual(M.auroc(probs, labels), 1.0)  # monotone map keeps the ranking
+        self.assertTrue(all(0 < q < 1 for q in probs))
+
     def test_auroc(self):
         self.assertEqual(M.auroc([0.1, 0.4, 0.35, 0.8], [0, 0, 1, 1]), 0.75)
         self.assertEqual(M.auroc([0.5, 0.5], [0, 1]), 0.5)
