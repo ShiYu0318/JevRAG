@@ -26,3 +26,6 @@ jevrag = "jevrag.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["jevrag*"]
+
+[tool.setuptools.package-data]
+jevrag = ["demo/static/*"]
