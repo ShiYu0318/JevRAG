@@ -10,5 +10,5 @@ dist/
 
 data/raw
 data/build
-results/
-cache/
+results
+cache
