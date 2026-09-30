@@ -69,6 +69,17 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a: Any) -> None:
         pass
 
+    def do_GET(self) -> None:
+        if self.path != "/health":
+            self.send_error(404)
+            return
+        out = json.dumps({"status": "ok", "model": "mock-0"}).encode()
+        self.send_response(200)
+        self.send_header("content-type", "application/json")
+        self.send_header("content-length", str(len(out)))
+        self.end_headers()
+        self.wfile.write(out)
+
     def do_POST(self) -> None:
         body = json.loads(self.rfile.read(int(self.headers["content-length"])))
         out = json.dumps(answer(body)).encode()
