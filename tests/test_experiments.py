@@ -115,6 +115,9 @@ class ExperimentsTest(unittest.TestCase):
 
     def test_tables(self):
         self.go(e3, "E3", {"dataset": str(self.root / "tc"), "n_per_condition": 2, "bootstrap": 20})
+        stopped = self.root / "results" / "E3-other-dev-20990101T000000"  # stopped early: manifest, no result
+        stopped.mkdir(parents=True)
+        (stopped / "manifest.json").write_text(json.dumps({"backend": "other", "split": "dev"}))
         written = make_tables(self.root / "results", self.root / "docs")
         self.assertTrue(any(p.name.startswith("E3") for p in written))
 
