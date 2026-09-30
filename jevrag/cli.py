@@ -139,6 +139,12 @@ def cmd_run(a: argparse.Namespace) -> None:
         print(run.dir)
 
 
+def cmd_demo(a: argparse.Namespace) -> None:
+    from .demo import serve
+
+    serve(a.port, a.results, a.dataset, a.milestones, None if a.no_cache else a.cache)
+
+
 def cmd_tables(a: argparse.Namespace) -> None:
     from .tables import make_tables
 
@@ -194,6 +200,15 @@ def main(argv: List[str] | None = None) -> None:
     au.add_argument("--no-nli", action="store_true")
     au.add_argument("--score", help="score a filled sheet instead of writing one")
     au.set_defaults(fn=cmd_audit)
+
+    dm = sub.add_parser("demo", help="local console: results, milestones and a live judge")
+    dm.add_argument("--port", type=int, default=8900)
+    dm.add_argument("--results", default="results")
+    dm.add_argument("--dataset", default="data/build/jevrag-tc-v0.1.0-k3")
+    dm.add_argument("--milestones", default="docs/milestones.json")
+    dm.add_argument("--cache", default="cache/calls.sqlite")
+    dm.add_argument("--no-cache", action="store_true")
+    dm.set_defaults(fn=cmd_demo)
 
     t = sub.add_parser("tables", help="render reports from results/")
     t.add_argument("--results", default="results")
