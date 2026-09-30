@@ -63,6 +63,15 @@ class PipelineTest(unittest.TestCase):
         with self.assertRaises(SystemOneError):
             pinned.ask("問題", {"x": {"type": "noul", "instructions": "?"}})
 
+    def test_kev_run_check(self):
+        from jevrag.backends import get_backend, loaded_run, run_mismatch
+        info = {"models": [{"name": "kev-latest", "run": "jaredpalmer/kev-0.8b"}]}
+        self.assertEqual(loaded_run(info), "jaredpalmer/kev-0.8b")
+        self.assertEqual(run_mismatch(get_backend("kev08b"), info), "")
+        self.assertIn("not kev-4b", run_mismatch(get_backend("kev4b"), info))
+        self.assertIn("no server", run_mismatch(get_backend("kev4b"), {}))
+        self.assertEqual(run_mismatch(self.client(), {}), "")  # no expected run: nothing to check
+
     def test_budget(self):
         c = self.client(usd_per_mtok=1e6, budget_usd=0.5)
         c.ask("a", {"x": {"type": "noul", "instructions": "?"}})
