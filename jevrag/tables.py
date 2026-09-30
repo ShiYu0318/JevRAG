@@ -7,9 +7,14 @@ from typing import Dict, List
 
 
 def _latest(results: Path, exp: str) -> Dict[str, Path]:
-    """Most recent run directory per backend for one experiment."""
+    """Most recent finished run directory per backend for one experiment.
+
+    A run that stopped early (budget, HTTP error) has a manifest but no result file; skip it.
+    """
     runs: Dict[str, Path] = {}
     for m in sorted(results.glob(f"{exp}-*/manifest.json")):
+        if not (m.parent / f"{exp}.json").exists():
+            continue
         man = json.loads(m.read_text(encoding="utf-8"))
         runs[f"{man['backend']} / {man['split']}"] = m.parent
     return runs
