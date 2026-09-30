@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JevRAG 主控台</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="rail">
+    <h1>JevRAG</h1>
+    <p class="sub">本機主控台，資料只在這台電腦上</p>
+    <ol class="timeline" id="milestones"></ol>
+    <div class="running" id="running" hidden></div>
+  </aside>
+
+  <main>
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-results" aria-selected="true" aria-controls="panel-results">實驗結果</button>
+      <button role="tab" id="tab-judge" aria-selected="false" aria-controls="panel-judge">試一題</button>
+    </div>
+
+    <div id="panel-results" role="tabpanel" aria-labelledby="tab-results"></div>
+
+    <div id="panel-judge" role="tabpanel" aria-labelledby="tab-judge" hidden>
+      <div class="controls">
+        <label>切分
+          <select id="split"><option value="dev">dev</option><option value="test">test</option></select>
+        </label>
+        <label>情境
+          <select id="condition">
+            <option value="">全部</option>
+            <option value="S">S 充足</option>
+            <option value="I-hard">I-hard 不足（困難）</option>
+            <option value="I-easy">I-easy 不足（簡單）</option>
+            <option value="P">P 部分</option>
+            <option value="C">C 衝突</option>
+            <option value="S-conj">S-conj 合取充足</option>
+            <option value="J">J 注入</option>
+          </select>
+        </label>
+        <label>指令語言
+          <select id="lang"><option value="en">英文</option><option value="zh">中文</option></select>
+        </label>
+        <button class="btn quiet" id="draw">抽一題</button>
+        <button class="btn quiet" id="toggle-custom">自己輸入</button>
+        <label style="flex-direction:row;display:flex;gap:.4rem;align-items:center;color:var(--ink)">
+          <input type="checkbox" id="reveal"> 顯示標籤
+        </label>
+      </div>
+
+      <div class="custom" id="custom" hidden>
+        <input type="text" id="custom-q" placeholder="問題，例如：國立中央大學在臺灣復校是哪一年？">
+        <textarea id="custom-p" placeholder="段落，每段之間空一行"></textarea>
+        <button class="btn quiet" id="use-custom">用這組內容</button>
+      </div>
+
+      <p class="meta">要判斷的模型</p>
+      <div class="backends" id="backends"></div>
+
+      <div id="instance" style="margin-top:1.5rem"></div>
+      <p style="margin-top:1rem"><button class="btn" id="judge" disabled>開始判斷</button> <span class="meta" id="judge-note"></span></p>
+      <div id="verdicts"></div>
+    </div>
+  </main>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>
