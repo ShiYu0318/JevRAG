@@ -102,7 +102,7 @@ def e2_report(results: Path) -> str:
     for key, d in sorted(_latest(results, "E2").items()):
         _, res, head = _load(d, "E2")
         parts += [f"## {key}", ""] + head
-        for label in ("raw", "scaled"):
+        for label in ("raw", "scaled", "platt_scaled"):
             if label in res:
                 parts += [f"### {label}", "", _table(["group", "n", "pos rate"] + cols,
                           [[g, r["n"], r["positive_rate"]] + [r[c] for c in cols] for g, r in res[label].items()]), ""]
@@ -113,8 +113,13 @@ def e2_report(results: Path) -> str:
                               [[g, r["n"], r["positive_rate"]] + [r[c] for c in cols]
                                for g, r in entry[label].items()]), ""]
         if "temperature" in res:
+            bound = [k for k, v in res.get("temperature_at_search_bound", {}).items() if v]
             parts += [f"Temperature (fitted on the fit split): passage {_fmt(res['temperature']['passage'])}, "
-                      f"set {_fmt(res['temperature']['set'])}", ""]
+                      f"set {_fmt(res['temperature']['set'])}"
+                      + (f" (at the search bound for {', '.join(bound)})" if bound else ""), ""]
+        if "platt" in res:
+            parts += ["Platt on logit: " + ", ".join(f"{k} a={_fmt(v['a'])} b={_fmt(v['b'])}"
+                                                    for k, v in res["platt"].items()), ""]
         h = res["h2"]
         parts += [f"H2: ECE easy {_fmt(h['ece_easy'])}, hard {_fmt(h['ece_hard'])}, gap {_fmt(h['gap'])}"
                   f" → {'supported' if h['supported'] else 'not supported'}", ""]
