@@ -20,6 +20,7 @@ Infrastructure stage. No results yet.
 | `jevrag/retrieval` | Character-bigram BM25, optional bge-m3, rank fusion |
 | `jevrag/metrics`, `jevrag/stats` | Ranking, calibration and selective-prediction metrics; bootstrap, McNemar, Holm |
 | `jevrag/experiments` | Experiment runners |
+| `jevrag/demo` | Local console for browsing results and judging a single question across backends |
 | `scripts/` | Mock server and a small run over `data/toy_zh.json` |
 
 The core uses only the Python standard library. OpenCC, sentence-transformers and PyYAML are optional extras.
@@ -33,6 +34,8 @@ python -m unittest discover -s tests
 ```
 
 The mock server fakes probabilities from character overlap. It only checks the plumbing.
+
+`python -m jevrag demo` opens a console on http://127.0.0.1:8900 that shows the latest run of each experiment and lets you send one question with its passages to several backends side by side. It only reads local files and binds to localhost.
 
 ## Backends
 
