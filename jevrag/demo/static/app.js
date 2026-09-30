@@ -23,7 +23,7 @@ const BACKEND_LABEL = { jev: "Jev", "laya-ml": "Laya 多語", "laya-en": "Laya �
 
 const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const pct = (x) => (x == null || Number.isNaN(x) ? "–" : x.toFixed(3));
+const pct = (x) => (x == null || Number.isNaN(x) ? "-" : x.toFixed(3));
 
 function backendColor(name) {
   const n = String(name).toLowerCase();
@@ -182,7 +182,7 @@ const SECTIONS = [
         const short = lat.find((x) => x.state_chars === 384) || lat[0];
         const c = r.result.consistency;
         const para = Object.values(c.paraphrase_flip_rates);
-        return [key, short ? `${Math.round(short.p50_ms)} ms` : "–", c.repeat_flip_rate_max, Math.max(...para),
+        return [key, short ? `${Math.round(short.p50_ms)} ms` : "-", c.repeat_flip_rate_max, Math.max(...para),
           r.result.packed_vs_separate.pointwise.gold_top1, r.result.packed_vs_separate.packed.gold_top1];
       });
       return table(["後端", "延遲 p50（384 字、1 題）", "重問翻轉率", "換說法翻轉率", "gold 排第一（逐段）", "gold 排第一（打包）"], rows);
