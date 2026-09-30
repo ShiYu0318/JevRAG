@@ -152,13 +152,16 @@ class SystemOneClient:
             return list(ex.map(lambda j: self.ask(*j, **kw), jobs))
 
     def server_info(self) -> Dict[str, Any]:
-        """GET /health when the server has one (Laya reports checkpoint revisions there)."""
-        url = self.url.rsplit("/v1/", 1)[0] + "/health"
-        try:
-            with urllib.request.urlopen(url, timeout=5) as r:
-                return json.loads(r.read().decode("utf-8"))
-        except (urllib.error.URLError, TimeoutError, ValueError, OSError):
-            return {}
+        """What the server reports about itself: GET /health (Laya reports checkpoint
+        revisions there), else GET /v1/models (Kev reports the loaded run there)."""
+        base = self.url.rsplit("/v1/", 1)[0]
+        for path in ("/health", "/v1/models"):
+            try:
+                with urllib.request.urlopen(base + path, timeout=5) as r:
+                    return json.loads(r.read().decode("utf-8"))
+            except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+                continue
+        return {}
 
     # ---- internals -----------------------------------------------------
     def _post(self, body: Dict[str, Any]) -> tuple:
