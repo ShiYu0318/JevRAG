@@ -85,13 +85,13 @@ def confident_error_rate(conf: Sequence[float], correct: Sequence[int], thr: flo
 _EPS = 1e-6
 
 
-def _logit(p: float) -> float:
+def logit(p: float) -> float:
     p = min(max(p, _EPS), 1 - _EPS)
     return math.log(p / (1 - p))
 
 
 def apply_temperature(probs: Sequence[float], t: float) -> List[float]:
-    return [1 / (1 + math.exp(-_logit(p) / t)) for p in probs]
+    return [1 / (1 + math.exp(-logit(p) / t)) for p in probs]
 
 
 def apply_temperature_multiclass(probs: Sequence[Mapping[str, float]], t: float) -> List[Dict[str, float]]:
