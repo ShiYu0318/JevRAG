@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import parse_qs, urlparse
 
-from ..backends import SystemOneClient, SystemOneError, get_backend
+from ..backends import SystemOneClient, SystemOneError, get_backend, run_mismatch
 from ..cache import CallCache
 from ..ops.sufficiency import aggregate, decide_action
 from ..questions import grade_v1, sufficiency_v1
@@ -110,8 +110,8 @@ class Judge:
                 out[name] = {"ok": True, "remote": True}
             else:
                 info = c.server_info()
-                out[name] = {"ok": bool(info), "remote": False,
-                             "reason": "" if info else f"no server at {c.url.rsplit('/v1/', 1)[0]}"}
+                reason = run_mismatch(c, info) if info else f"no server at {c.url.rsplit('/v1/', 1)[0]}"
+                out[name] = {"ok": not reason, "remote": False, "reason": reason}
         return out
 
     def run(self, name: str, question: str, passages: List[str], lang: str = "en") -> Dict[str, Any]:
@@ -212,7 +212,7 @@ def serve(port: int = 8900, results: str | Path = "results", dataset: str | Path
           backends: Optional[List[str]] = None, background: bool = False) -> ThreadingHTTPServer:
     handler = make_handler(Path(results), Benchmark(Path(dataset)), Judge(CallCache(cache) if cache else None),
                            Path(milestones) if milestones else None,
-                           backends or ["jev", "laya-ml", "laya-en", "kev4b", "mock"])
+                           backends or ["jev", "laya-ml", "laya-en", "kev08b", "kev4b", "mock"])
     srv = ThreadingHTTPServer(("127.0.0.1", port), handler)
     if background:
         threading.Thread(target=srv.serve_forever, daemon=True).start()

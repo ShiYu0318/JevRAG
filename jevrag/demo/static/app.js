@@ -19,7 +19,7 @@ const METHOD_ZH = {
   "pointwise:noul_then_score": "逐段：先看含答案再看相關度",
   "packed:noul_then_score": "打包成一次請求",
 };
-const BACKEND_LABEL = { jev: "Jev", "laya-ml": "Laya 多語", "laya-en": "Laya 英文", kev4b: "Kev-4B", mock: "Mock" };
+const BACKEND_LABEL = { jev: "Jev", "laya-ml": "Laya 多語", "laya-en": "Laya 英文", kev08b: "Kev-0.8B", kev4b: "Kev-4B", mock: "Mock" };
 
 const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
