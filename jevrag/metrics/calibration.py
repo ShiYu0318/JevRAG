@@ -128,29 +128,59 @@ def fit_temperature(probs: Sequence[float], labels: Sequence[int], lo: float = 0
     return math.exp((a + b) / 2)
 
 
-def fit_platt(scores: Sequence[float], labels: Sequence[int], iters: int = 50) -> Tuple[float, float]:
-    """Platt scaling: fit P(y=1) = sigmoid(a * score + b) by Newton's method."""
-    a, b = 1.0, 0.0
+def fit_platt(scores: Sequence[float], labels: Sequence[int], iters: int = 100) -> Tuple[float, float]:
+    """Platt scaling: fit P(y=1) = sigmoid(a * score + b).
+
+    Uses Platt's smoothed targets so (nearly) separable data still has a finite
+    optimum, and damped Newton steps with backtracking so every step lowers the loss.
+    """
+    n_pos = sum(1 for y in labels if y)
+    n_neg = len(labels) - n_pos
+    hi, lo = (n_pos + 1) / (n_pos + 2), 1 / (n_neg + 2)
+    targets = [hi if y else lo for y in labels]
+
+    def loss(a: float, b: float) -> float:
+        total = 0.0
+        for s, t in zip(scores, targets):
+            z = a * s + b
+            # log(1 + e^z) computed stably
+            softplus = z + math.log1p(math.exp(-z)) if z > 0 else math.log1p(math.exp(z))
+            total += softplus - t * z
+        return total
+
+    a, b = 0.0, math.log((n_pos + 1) / (n_neg + 1))
+    cur = loss(a, b)
     for _ in range(iters):
         ga = gb = haa = hab = hbb = 0.0
-        for s, y in zip(scores, labels):
-            p = 1 / (1 + math.exp(-max(-35.0, min(35.0, a * s + b))))
-            w = p * (1 - p)
-            ga += (p - y) * s
-            gb += p - y
+        for s, t in zip(scores, targets):
+            z = a * s + b
+            p = 1 / (1 + math.exp(-z)) if z >= 0 else math.exp(z) / (1 + math.exp(z))
+            w = max(p * (1 - p), 1e-12)
+            ga += (p - t) * s
+            gb += p - t
             haa += w * s * s
             hab += w * s
             hbb += w
-        haa += 1e-6
-        hbb += 1e-6
+        haa += 1e-12
+        hbb += 1e-12
         det = haa * hbb - hab * hab
         if det <= 0:
             break
         da = (hbb * ga - hab * gb) / det
         db = (haa * gb - hab * ga) / det
-        a, b = a - da, b - db
-        if abs(da) < 1e-9 and abs(db) < 1e-9:
+        step = 1.0
+        while step > 1e-10:
+            na, nb = a - step * da, b - step * db
+            new = loss(na, nb)
+            if new < cur:
+                break
+            step /= 2
+        else:
             break
+        if cur - new < 1e-10 * max(1.0, abs(cur)):
+            a, b, cur = na, nb, new
+            break
+        a, b, cur = na, nb, new
     return a, b
 
 
